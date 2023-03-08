@@ -6,8 +6,8 @@ Tested on windows. Might not work on Mac.
 
 ```
 conda create -n drone python=3.10
-pip install -r requirements.txt
 conda activate drone
+pip install -r requirements.txt
 ```
 
 # Run
