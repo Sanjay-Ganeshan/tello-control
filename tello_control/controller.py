@@ -1,3 +1,4 @@
+import numpy as np
 import pygame
 import typing as T
 from dataclasses import dataclass, field
@@ -27,22 +28,66 @@ class Button:
 
 @dataclass
 class ControllerState:
+    # Each of these vary between -1 and 1.
+    # L_THUMBSTICK left (towards -1): Strafe left.
+    # L_THUMBSTICK right (towards 1): Strafe right.
     L_THUMBSTICK_X: float = 0.0
+
+    # L_THUMBSTICK backward (towards -1): Strafe backward.
+    # L_THUMBSTICK forward (towards 1): Strafe forward.
     L_THUMBSTICK_Y: float = 0.0
+    
+    # R_THUMBSTICK left (towards -1): Rotate left.
+    # R_THUMBSTICK right (towards 1): Rotate right.
     R_THUMBSTICK_X: float = 0.0
+
+    # Does nothing.
     R_THUMBSTICK_Y: float = 0.0
+
+    # Each of these vary from 0 to 1.
+    # L_TRIGGER: Press to lower altitude.
     L_TRIGGER: float = 0.0
+    
+    # R_TRIGGER: Press to increase altitude.
     R_TRIGGER: float = 0.0
+
+    # No Button Pressed = (0, 0)
+    # Down: (0, -1)
+    # Left: (-1, 0)
+    # Right: (1, 0)
+    # Up: (0, 1)
+    # D_PAD does nothing.
     D_PAD: T.Tuple[int, int] = (0, 0)
+
+    # Connect to the tello.
     START: Button = field(default_factory=Button)
+    
+    # Does nothing.
     BACK: Button = field(default_factory=Button)
+
+    # Emergency (immediately shuts off motors).
     HOME: Button = field(default_factory=Button)
+
+    # Does nothing.
     SHIELD: Button = field(default_factory=Button)
+
+    # Takeoff.
     A: Button = field(default_factory=Button)
+
+    # Land.
     B: Button = field(default_factory=Button)
+
+    # Enable video stream.
     X: Button = field(default_factory=Button)
+
+    # Disable video stream.
     Y: Button = field(default_factory=Button)
+
+    # Does nothing.
     L_BUTTON: Button = field(default_factory=Button)
+
+    # Toggles between autonomous mode and control. Autonomous mode is
+    # governed by the script you write.
     R_BUTTON: Button = field(default_factory=Button)
 
     def _tick(self) -> None:
@@ -56,9 +101,6 @@ class ControllerState:
         self.Y._tick()
         self.L_BUTTON._tick()
         self.R_BUTTON._tick()
-    
-def clamp(x: float, minimum: float, maximum: float) -> float:
-    return min(max(x, minimum), maximum)
 
 def draw_controllers(screen: pygame.Surface, controller: ControllerState) -> None:
     width, height = screen.get_size()
@@ -140,31 +182,39 @@ def draw_controllers(screen: pygame.Surface, controller: ControllerState) -> Non
     )
 
 def _to_control(x: float) -> int:
-    return clamp(int(x * 100), -100, 100)
+    return np.clip(int(x * 100), -100, 100)
 
 def control_drone(tello: Tello, controller: ControllerState) -> None:
     if controller.A.down():
+        # TODO: If your drone crashes, tello.is_flying is False, so you can't
+        # takeoff again. But, if you call tello.takeoff() twice in the air,
+        # the drone returns errors and crashes.
         print("takeoff")
         if not tello.is_flying:
             tello.takeoff()
     if controller.B.down():
         print("land")
+        # TODO: If you call land twice in the air or on the ground, the program
+        # crashes and the drone lands.
         if tello.is_flying:
             tello.land()
     if controller.HOME.down():
         print("emergency")
+        # Shuts off motors immediately.
         tello.emergency()
     if controller.START.down():
         print("connect")
         tello.connect()
     if controller.X.down():
         print("streamon")
+        # Enables video stream.
         tello.streamon()
     if controller.Y.down():
         print("streamoff")
+        # Disables video stream.
         tello.streamoff()
     
-    # Unsupported by our tello
+    # Unsupported by our tello - might need a firmware update.
     """
     if controller.R_BUTTON.down():
         print("FWD camera")
@@ -183,6 +233,11 @@ def control_drone(tello: Tello, controller: ControllerState) -> None:
         yaw_velocity = 0
         fw_backward_velocity = 0
         left_right_velocity = 0
+
+        # The 0.1 here is a dead zone where we ignore the input. This is
+        # to cope with small amounts of drift.
+        # Notice below that if both triggers are pressed at once, we prefer
+        # descending to ascending.
         if controller.L_TRIGGER > 0.1:
             up_down_velocity = ((controller.L_TRIGGER - 0.1) / 0.9) * -1
         elif controller.R_TRIGGER > 0.1:
@@ -286,17 +341,17 @@ def main() -> None:
                     should_quit = True
                 elif event.type == pygame.JOYAXISMOTION:
                     if event.axis == 1:
-                        controller_state.L_THUMBSTICK_Y = clamp(-1.0 * event.value, -1.0, 1.0)
+                        controller_state.L_THUMBSTICK_Y = np.clip(-1.0 * event.value, -1.0, 1.0)
                     elif event.axis == 0:
-                        controller_state.L_THUMBSTICK_X = clamp(event.value, -1.0, 1.0)
+                        controller_state.L_THUMBSTICK_X = np.clip(event.value, -1.0, 1.0)
                     elif event.axis == 6:
-                        controller_state.R_THUMBSTICK_Y = clamp(-1.0 * event.value, -1.0, 1.0)
+                        controller_state.R_THUMBSTICK_Y = np.clip(-1.0 * event.value, -1.0, 1.0)
                     elif event.axis == 3:
-                        controller_state.R_THUMBSTICK_X = clamp(event.value, -1.0, 1.0)
+                        controller_state.R_THUMBSTICK_X = np.clip(event.value, -1.0, 1.0)
                     elif event.axis == 4:
-                        controller_state.L_TRIGGER = clamp((event.value + 1.0) / 2.0, 0.0, 1.0)
+                        controller_state.L_TRIGGER = np.clip((event.value + 1.0) / 2.0, 0.0, 1.0)
                     elif event.axis == 5:
-                        controller_state.R_TRIGGER = clamp((event.value + 1.0) / 2.0, -1.0, 1.0)
+                        controller_state.R_TRIGGER = np.clip((event.value + 1.0) / 2.0, -1.0, 1.0)
                 elif event.type == pygame.JOYBUTTONDOWN or event.type == pygame.JOYBUTTONUP:
                     newval = True if event.type == pygame.JOYBUTTONDOWN else False
                     if event.button == 8:

@@ -2,6 +2,7 @@ import mmap
 import numpy as np
 import typing as T
 from dataclasses import dataclass, field
+import sys
 
 CAMERA_W = 960
 CAMERA_H = 720
@@ -51,12 +52,17 @@ class DroneIPC:
         self._shmem = None
 
     def __enter__(self) -> "DroneIPC":
-        self._shmem = mmap.mmap(-1, BUFFER_LENGTH, tagname="droneipc")
+        # This function is only called once, so it can be expensive
+        if sys.platform == "win32":
+            self._shmem = mmap.mmap(-1, BUFFER_LENGTH, tagname="droneipc")
+        else:
+            self._shmem = bytearray(BUFFER_LENGTH)
         self._arr = np.frombuffer(self._shmem, dtype=np.uint8)
         return self
     
     def __exit__(self, exc_type, exc, tb):
-        self._shmem.close()
+        if sys.platform == "win32":
+            self._shmem.close()
     
     def save_state(self, state: DroneState) -> None:
         commands = np.uint8(
