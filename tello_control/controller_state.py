@@ -127,7 +127,7 @@ class Input:
             self._axes[key] = clamp(value, -1.0, 1.0)
         elif isinstance(key, Button):
             assert isinstance(value, bool)
-            self._axes[key] = value
+            self._buttons[key] = value
         elif isinstance(key, Hat):
             assert isinstance(value, tuple) and len(value) == 2 and all((v in [-1, 0, 1] for v in value))
             self._hats[key] = value
@@ -151,8 +151,11 @@ class AxisBinding(Binding):
     def process_event(self, event: pygame.event.Event, controller: Input) -> None:
         if event.type == pygame.JOYAXISMOTION:
             if event.axis == self.axis_id:
-                value = 0 if abs(event.value) < self.deadzone else ((event.value - sign(event.value)) / (1.0 - self.deadzone))
-                controller[self.axis] = value * self.multiply + self.offset
+                value = 0 if abs(event.value) < self.deadzone else (
+                    (event.value - sign(event.value) * self.deadzone) / (1.0 - self.deadzone)
+                )
+                adjusted = value * self.multiply + self.offset
+                controller[self.axis] = adjusted
 
 @dataclass
 class ButtonBinding(Binding):
@@ -203,8 +206,8 @@ WINDOWS_SHIELD_CONTROLLER: T.List[Binding] = [
     AxisBinding(
         axis=Axis1D.R_TRIGGER,
         axis_id=5,
-        multiply=-0.5,
-        offset=-0.5,
+        multiply=0.5,
+        offset=0.5,
     ),
 
     ButtonBinding(
