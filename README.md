@@ -1,6 +1,6 @@
 # Requirements
 
-Tested on windows. Might not work on Mac.
+Tested on Windows and Mac.
 
 # Install
 
