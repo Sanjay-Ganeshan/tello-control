@@ -1,12 +1,10 @@
-import numpy as np
 import pygame
 import typing as T
 from dataclasses import dataclass, field
 import time
 from djitellopy import Tello
 import cv2
-import os
-from .autonomous import DroneState, DroneIPC
+from .autonomous import DroneIPC
 import logging
 
 @dataclass
@@ -181,8 +179,13 @@ def draw_controllers(screen: pygame.Surface, controller: ControllerState) -> Non
         rect=((r_trigger_l, trigger_top + (trigger_height - r_trigger_offset)), (trigger_width, r_trigger_offset)),
     )
 
+
+def clamp(x: T.Union[int,float], min_val: T.Union[int,float], max_val: T.Union[int,float]) -> T.Union[int,float]:
+    return min(max(x, min_val), max_val)
+
+
 def _to_control(x: float) -> int:
-    return np.clip(int(x * 100), -100, 100)
+    return int(clamp(x * 100, -100, 100))
 
 def control_drone(tello: Tello, controller: ControllerState) -> None:
     if controller.A.down():
@@ -341,17 +344,17 @@ def main() -> None:
                     should_quit = True
                 elif event.type == pygame.JOYAXISMOTION:
                     if event.axis == 1:
-                        controller_state.L_THUMBSTICK_Y = np.clip(-1.0 * event.value, -1.0, 1.0)
+                        controller_state.L_THUMBSTICK_Y = clamp(-1.0 * event.value, -1.0, 1.0)
                     elif event.axis == 0:
-                        controller_state.L_THUMBSTICK_X = np.clip(event.value, -1.0, 1.0)
+                        controller_state.L_THUMBSTICK_X = clamp(event.value, -1.0, 1.0)
                     elif event.axis == 6:
-                        controller_state.R_THUMBSTICK_Y = np.clip(-1.0 * event.value, -1.0, 1.0)
+                        controller_state.R_THUMBSTICK_Y = clamp(-1.0 * event.value, -1.0, 1.0)
                     elif event.axis == 3:
-                        controller_state.R_THUMBSTICK_X = np.clip(event.value, -1.0, 1.0)
+                        controller_state.R_THUMBSTICK_X = clamp(event.value, -1.0, 1.0)
                     elif event.axis == 4:
-                        controller_state.L_TRIGGER = np.clip((event.value + 1.0) / 2.0, 0.0, 1.0)
+                        controller_state.L_TRIGGER = clamp((event.value + 1.0) / 2.0, 0.0, 1.0)
                     elif event.axis == 5:
-                        controller_state.R_TRIGGER = np.clip((event.value + 1.0) / 2.0, -1.0, 1.0)
+                        controller_state.R_TRIGGER = clamp((event.value + 1.0) / 2.0, -1.0, 1.0)
                 elif event.type == pygame.JOYBUTTONDOWN or event.type == pygame.JOYBUTTONUP:
                     newval = True if event.type == pygame.JOYBUTTONDOWN else False
                     if event.button == 8:
