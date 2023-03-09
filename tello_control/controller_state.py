@@ -256,3 +256,82 @@ WINDOWS_SHIELD_CONTROLLER: T.List[Binding] = [
         hat_id=0
     )
 ]
+
+MAC_SHIELD_CONTROLLER: T.List[Binding] = [
+    AxisBinding(
+        axis=Axis1D.L_THUMBSTICK_Y,
+        axis_id=1,
+        multiply=-1,
+    ),
+    AxisBinding(
+        axis=Axis1D.L_THUMBSTICK_X,
+        axis_id=0,
+    ),
+    AxisBinding(
+        axis=Axis1D.R_THUMBSTICK_Y,
+        axis_id=5,
+        multiply=-1,
+    ),
+    AxisBinding(
+        axis=Axis1D.R_THUMBSTICK_X,
+        axis_id=2,
+    ),
+    AxisBinding(
+        axis=Axis1D.L_TRIGGER,
+        axis_id=7,
+        multiply=0.5,
+        offset=0.5,
+    ),
+    AxisBinding(
+        axis=Axis1D.R_TRIGGER,
+        axis_id=6,
+        multiply=0.5,
+        offset=0.5,
+    ),
+
+    ButtonBinding(
+        button=Button.Y,
+        button_id=3,
+    ),
+    ButtonBinding(
+        button=Button.X,
+        button_id=2,
+    ),
+    ButtonBinding(
+        button=Button.B,
+        button_id=1,
+    ),
+    ButtonBinding(
+        button=Button.A,
+        button_id=0,
+    ),
+    ButtonBinding(
+        button=Button.R_BUTTON,
+        button_id=5,
+    ),
+    ButtonBinding(
+        button=Button.L_BUTTON,
+        button_id=4,
+    ),
+    ButtonBinding(
+        button=Button.START,
+        button_id=6,
+    ),
+    ButtonBinding(
+        button=Button.BACK,
+        button_id=17,
+    ),
+    ButtonBinding(
+        button=Button.HOME,
+        button_id=16,
+    ),
+    ButtonBinding(
+        button=Button.SHIELD,
+        button_id=15,
+    ),
+
+    HatBinding(
+        hat=Hat.D_PAD,
+        hat_id=0
+    )
+]
