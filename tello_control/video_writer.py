@@ -3,7 +3,7 @@ from .autonomous import DroneIPC, DroneState, CAMERA_W, CAMERA_H
 import cv2
 
 def main():
-    frames_per_second = 60
+    frames_per_second = 30
     show_frame = False
 
     ms_per_iteration = 1000.0 / frames_per_second
