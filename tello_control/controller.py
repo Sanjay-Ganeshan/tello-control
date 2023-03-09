@@ -323,7 +323,7 @@ def main() -> None:
     size = (1280, 800)
     screen = pygame.display.set_mode(size)
     tello = Tello()
-    tello.LOGGER.setLevel(logging.WARNING)
+    tello.LOGGER.setLevel(logging.INFO)
     n_controllers = pygame.joystick.get_count()
     assert n_controllers == 1
     joystick = pygame.joystick.Joystick(0)
