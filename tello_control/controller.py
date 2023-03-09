@@ -6,107 +6,31 @@ from djitellopy import Tello
 import cv2
 from .autonomous import DroneIPC
 import logging
+from .controller_state import (
+    clamp,
+    WINDOWS_SHIELD_CONTROLLER,
+    Binding,
+    Input,
+    Axis1D,
+    Button,
+    Hat,
+)
+import sys
 
-@dataclass
-class Button:
-    current: bool = False
-    previous: bool = field(default=False, init=False)
+CONTROLLER: T.List[Binding]
+if sys.platform == "win32":
+    CONTROLLER = WINDOWS_SHIELD_CONTROLLER
+else:
+    CONTROLLER = WINDOWS_SHIELD_CONTROLLER
 
-    def down(self) -> bool:
-        return self.current and not self.previous
-    
-    def get(self) -> bool:
-        return self.current
 
-    def up(self) -> bool:
-        return not self.current and self.previous
-    
-    def _tick(self) -> None:
-        self.previous = self.current
-
-@dataclass
-class ControllerState:
-    # Each of these vary between -1 and 1.
-    # L_THUMBSTICK left (towards -1): Strafe left.
-    # L_THUMBSTICK right (towards 1): Strafe right.
-    L_THUMBSTICK_X: float = 0.0
-
-    # L_THUMBSTICK backward (towards -1): Strafe backward.
-    # L_THUMBSTICK forward (towards 1): Strafe forward.
-    L_THUMBSTICK_Y: float = 0.0
-    
-    # R_THUMBSTICK left (towards -1): Rotate left.
-    # R_THUMBSTICK right (towards 1): Rotate right.
-    R_THUMBSTICK_X: float = 0.0
-
-    # Does nothing.
-    R_THUMBSTICK_Y: float = 0.0
-
-    # Each of these vary from 0 to 1.
-    # L_TRIGGER: Press to lower altitude.
-    L_TRIGGER: float = 0.0
-    
-    # R_TRIGGER: Press to increase altitude.
-    R_TRIGGER: float = 0.0
-
-    # No Button Pressed = (0, 0)
-    # Down: (0, -1)
-    # Left: (-1, 0)
-    # Right: (1, 0)
-    # Up: (0, 1)
-    # D_PAD does nothing.
-    D_PAD: T.Tuple[int, int] = (0, 0)
-
-    # Connect to the tello.
-    START: Button = field(default_factory=Button)
-    
-    # Does nothing.
-    BACK: Button = field(default_factory=Button)
-
-    # Emergency (immediately shuts off motors).
-    HOME: Button = field(default_factory=Button)
-
-    # Does nothing.
-    SHIELD: Button = field(default_factory=Button)
-
-    # Takeoff.
-    A: Button = field(default_factory=Button)
-
-    # Land.
-    B: Button = field(default_factory=Button)
-
-    # Enable video stream.
-    X: Button = field(default_factory=Button)
-
-    # Disable video stream.
-    Y: Button = field(default_factory=Button)
-
-    # Does nothing.
-    L_BUTTON: Button = field(default_factory=Button)
-
-    # Toggles between autonomous mode and control. Autonomous mode is
-    # governed by the script you write.
-    R_BUTTON: Button = field(default_factory=Button)
-
-    def _tick(self) -> None:
-        self.START._tick()
-        self.BACK._tick()
-        self.HOME._tick()
-        self.SHIELD._tick()
-        self.A._tick()
-        self.B._tick()
-        self.X._tick()
-        self.Y._tick()
-        self.L_BUTTON._tick()
-        self.R_BUTTON._tick()
-
-def draw_controllers(screen: pygame.Surface, controller: ControllerState) -> None:
+def draw_controllers(screen: pygame.Surface, controller: Input) -> None:
     width, height = screen.get_size()
 
-    l_offset_x = controller.L_THUMBSTICK_X * width // 12
-    l_offset_y = -1 * controller.L_THUMBSTICK_Y * width // 12
-    r_offset_x = controller.R_THUMBSTICK_X * width // 12
-    r_offset_y = -1 * controller.R_THUMBSTICK_Y * width // 12
+    l_offset_x = controller[Axis1D.L_THUMBSTICK_X] * width // 12
+    l_offset_y = -1 * controller[Axis1D.L_THUMBSTICK_Y] * width // 12
+    r_offset_x = controller[Axis1D.R_THUMBSTICK_X] * width // 12
+    r_offset_y = -1 * controller[Axis1D.R_THUMBSTICK_Y] * width // 12
 
     l_thumbstick_x = 2 * width // 12
     r_thumbstick_x = 10 * width // 12
@@ -152,8 +76,8 @@ def draw_controllers(screen: pygame.Surface, controller: ControllerState) -> Non
     l_trigger_l = width // 6 - trigger_width // 2
     r_trigger_l = 5 * width // 6 - trigger_width // 2
 
-    l_trigger_offset = int(controller.L_TRIGGER * trigger_height)
-    r_trigger_offset = int(controller.R_TRIGGER * trigger_height)
+    l_trigger_offset = int(controller[Axis1D.L_TRIGGER] * trigger_height)
+    r_trigger_offset = int(controller[Axis1D.R_TRIGGER] * trigger_height)
 
     pygame.draw.rect(
         surface=screen,
@@ -180,51 +104,46 @@ def draw_controllers(screen: pygame.Surface, controller: ControllerState) -> Non
     )
 
 
-def clamp(x: T.Union[int,float], min_val: T.Union[int,float], max_val: T.Union[int,float]) -> T.Union[int,float]:
-    return min(max(x, min_val), max_val)
+
 
 
 def _to_control(x: float) -> int:
     return int(clamp(x * 100, -100, 100))
 
-def control_drone(tello: Tello, controller: ControllerState) -> None:
-    if controller.A.down():
+def control_drone(tello: Tello, controller: Input) -> None:
+    if controller.get_down(Button.A):
         # TODO: If your drone crashes, tello.is_flying is False, so you can't
         # takeoff again. But, if you call tello.takeoff() twice in the air,
         # the drone returns errors and crashes.
         print("takeoff")
         if not tello.is_flying:
             tello.takeoff()
-    if controller.B.down():
+    if controller.get_down(Button.B):
         print("land")
         # TODO: If you call land twice in the air or on the ground, the program
         # crashes and the drone lands.
         if tello.is_flying:
             tello.land()
-    if controller.HOME.down():
-        print("emergency")
-        # Shuts off motors immediately.
-        tello.emergency()
-    if controller.START.down():
+    if controller.get_down(Button.START):
         print("connect")
         tello.connect()
-    if controller.X.down():
+    if controller.get_down(Button.X):
         print("streamon")
         # Enables video stream.
         tello.streamon()
-    if controller.Y.down():
+    if controller.get_down(Button.Y):
         print("streamoff")
         # Disables video stream.
         tello.streamoff()
     
     # Unsupported by our tello - might need a firmware update.
     """
-    if controller.R_BUTTON.down():
+    if controller.get_down(Button.R_BUTTON):
         print("FWD camera")
         tello.set_video_direction(
             Tello.CAMERA_FORWARD
         )
-    if controller.L_BUTTON.down():
+    if controller.get_down(Button.L_BUTTON):
         print("DOWN camera")
         tello.set_video_direction(
             Tello.CAMERA_DOWNWARD
@@ -241,23 +160,11 @@ def control_drone(tello: Tello, controller: ControllerState) -> None:
         # to cope with small amounts of drift.
         # Notice below that if both triggers are pressed at once, we prefer
         # descending to ascending.
-        if controller.L_TRIGGER > 0.1:
-            up_down_velocity = ((controller.L_TRIGGER - 0.1) / 0.9) * -1
-        elif controller.R_TRIGGER > 0.1:
-            up_down_velocity = ((controller.R_TRIGGER - 0.1) / 0.9)
-        
-        if abs(controller.R_THUMBSTICK_X) > 0.1:
-            offset = -0.1 if controller.R_THUMBSTICK_X > 0 else 0.1
-            yaw_velocity = ((controller.R_THUMBSTICK_X + offset) / 0.9)
-        
-        if abs(controller.L_THUMBSTICK_X) > 0.1:
-            offset = -0.1 if controller.L_THUMBSTICK_X > 0 else 0.1
-            left_right_velocity = ((controller.L_THUMBSTICK_X + offset) / 0.9)
-        
-        if abs(controller.L_THUMBSTICK_Y) > 0.1:
-            offset = -0.1 if controller.L_THUMBSTICK_Y > 0 else 0.1
-            fw_backward_velocity = ((controller.L_THUMBSTICK_Y + offset) / 0.9)
-        
+        up_down_velocity = controller[Axis1D.R_TRIGGER] - controller[Axis1D.L_TRIGGER]
+        yaw_velocity = controller[Axis1D.R_THUMBSTICK_X]
+        left_right_velocity = controller[Axis1D.L_THUMBSTICK_X]
+        fw_backward_velocity = controller[Axis1D.L_THUMBSTICK_Y]
+
         tello.send_rc_control(
             left_right_velocity=_to_control(left_right_velocity),
             forward_backward_velocity=_to_control(fw_backward_velocity),
@@ -331,7 +238,7 @@ def main() -> None:
     should_quit: bool = False
     target_seconds_per_frame: float = 1 / 60
     
-    controller_state = ControllerState()
+    controller_state = Input()
 
     autonomous_mode = False
 
@@ -342,52 +249,17 @@ def main() -> None:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT or (event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE):
                     should_quit = True
-                elif event.type == pygame.JOYAXISMOTION:
-                    if event.axis == 1:
-                        controller_state.L_THUMBSTICK_Y = clamp(-1.0 * event.value, -1.0, 1.0)
-                    elif event.axis == 0:
-                        controller_state.L_THUMBSTICK_X = clamp(event.value, -1.0, 1.0)
-                    elif event.axis == 6:
-                        controller_state.R_THUMBSTICK_Y = clamp(-1.0 * event.value, -1.0, 1.0)
-                    elif event.axis == 3:
-                        controller_state.R_THUMBSTICK_X = clamp(event.value, -1.0, 1.0)
-                    elif event.axis == 4:
-                        controller_state.L_TRIGGER = clamp((event.value + 1.0) / 2.0, 0.0, 1.0)
-                    elif event.axis == 5:
-                        controller_state.R_TRIGGER = clamp((event.value + 1.0) / 2.0, -1.0, 1.0)
-                elif event.type == pygame.JOYBUTTONDOWN or event.type == pygame.JOYBUTTONUP:
-                    newval = True if event.type == pygame.JOYBUTTONDOWN else False
-                    if event.button == 8:
-                        controller_state.Y.current = newval
-                    elif event.button == 9:
-                        controller_state.X.current = newval
-                    elif event.button == 10:
-                        controller_state.B.current = newval
-                    elif event.button == 11:
-                        controller_state.A.current = newval
-                    elif event.button == 6:
-                        controller_state.R_BUTTON.current = newval
-                    elif event.button == 7:
-                        controller_state.L_BUTTON.current = newval
-                    elif event.button == 3:
-                        controller_state.START.current = newval
-                    elif event.button == 13:
-                        controller_state.BACK.current = newval
-                    elif event.button == 14:
-                        controller_state.HOME.current = newval
-                    elif event.button == 12:
-                        controller_state.SHIELD.current = newval
-                elif event.type == pygame.JOYHATMOTION:
-                    if event.hat == 0:
-                        controller_state.D_PAD = event.value
-                        print(event.value)
+                for each_binding in CONTROLLER:
+                    each_binding.process_event(event, controller_state)
 
             if should_quit:
                 break
 
-            if controller_state.R_BUTTON.down():
+            if controller_state.get_down(Button.R_BUTTON):
                 autonomous_mode = not autonomous_mode
                 print(f"{autonomous_mode=}")
+            if controller_state.get_down(Button.HOME):
+                tello.emergency()
 
             if autonomous_mode:
                 control_drone_autonomous(tello, ipc)
