@@ -3,6 +3,7 @@ import numpy as np
 import typing as T
 from dataclasses import dataclass, field
 import sys
+import os
 
 CAMERA_W = 960
 CAMERA_H = 720
@@ -50,19 +51,25 @@ class DroneIPC:
     def __init__(self):
         self._arr = None
         self._shmem = None
+        self.fd = None
 
     def __enter__(self) -> "DroneIPC":
         # This function is only called once, so it can be expensive
         if sys.platform == "win32":
+            # Windows.
             self._shmem = mmap.mmap(-1, BUFFER_LENGTH, tagname="droneipc")
-        else:
-            self._shmem = bytearray(BUFFER_LENGTH)
+        elif sys.platform == "darwin":
+            # Mac.
+            self.fd = os.open("/tmp/droneipc", os.O_CREAT | os.O_RDWR, mode=0o777)
+            os.ftruncate(self.fd, BUFFER_LENGTH)
+            self._shmem = mmap.mmap(self.fd, BUFFER_LENGTH)
         self._arr = np.frombuffer(self._shmem, dtype=np.uint8)
         return self
     
     def __exit__(self, exc_type, exc, tb):
-        if sys.platform == "win32":
-            self._shmem.close()
+        self._shmem.close()
+        if self.fd:
+            os.close(self.fd)
     
     def save_state(self, state: DroneState) -> None:
         commands = np.uint8(
@@ -102,7 +109,7 @@ class DroneIPC:
             np.copyto(self._arr[CONTROL_LENGTH_IN_BYTES:], frame.reshape((-1,)))
 
     def get_frame(self) -> np.ndarray:
-        arr = np.array((FRAME_LENGTH_IN_BYTES,), dtype=np.uint8)
+        arr = np.empty((FRAME_LENGTH_IN_BYTES,), dtype=np.uint8)
         np.copyto(arr, self._arr[CONTROL_LENGTH_IN_BYTES:])
         return arr.reshape((CAMERA_H, CAMERA_W, CAMERA_C))
 
