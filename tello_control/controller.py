@@ -268,7 +268,7 @@ def main() -> None:
             if controller_state.get_down(Button.R_BUTTON):
                 autonomous_mode = not autonomous_mode
                 print(f"{autonomous_mode=}")
-            if controller_state.get_down(Button.HOME):
+            if controller_state.get_down(Button.L_BUTTON):
                 tello.emergency()
 
             if autonomous_mode:
