@@ -6,6 +6,7 @@ from djitellopy import Tello
 import cv2
 from .autonomous import DroneIPC
 import logging
+from .sound_cues import SoundCuePlayer, SoundCue
 from .controller_state import (
     clamp,
     WINDOWS_SHIELD_CONTROLLER,
@@ -21,6 +22,8 @@ import sys
 
 CONTROLLER: T.List[Binding]
 SCREEN_FLAGS = pygame.RESIZABLE
+FULL_SCREEN_DRONE = False
+
 if sys.platform == "win32":
     CONTROLLER = WINDOWS_SHIELD_CONTROLLER
 elif sys.platform == "darwin":
@@ -28,6 +31,7 @@ elif sys.platform == "darwin":
 elif sys.platform == "linux":
     CONTROLLER = STEAM_DECK_INTEGRATED_CONTROLLER
     SCREEN_FLAGS= pygame.FULLSCREEN
+    FULL_SCREEN_DRONE = True
 else:
     raise Exception("Your controller bindings are not defined.")
 
@@ -120,31 +124,38 @@ def draw_controllers(screen: pygame.Surface, controller: Input) -> None:
 def _to_control(x: float) -> int:
     return int(clamp(x * 100, -100, 100))
 
-def control_drone(tello: Tello, controller: Input) -> None:
+def control_drone(tello: Tello, controller: Input, sound_player: SoundCuePlayer) -> None:
     if controller.get_down(Button.A):
         # TODO: If your drone crashes, tello.is_flying is False, so you can't
         # takeoff again. But, if you call tello.takeoff() twice in the air,
         # the drone returns errors and crashes.
         print("takeoff")
         if not tello.is_flying:
+            sound_player.cue(SoundCue.TAKEOFF)
             tello.takeoff()
+            sound_player.cue(SoundCue.READY)
     if controller.get_down(Button.B):
         print("land")
         # TODO: If you call land twice in the air or on the ground, the program
         # crashes and the drone lands.
         if tello.is_flying:
             tello.land()
+            sound_player.cue(SoundCue.LANDING)
     if controller.get_down(Button.START):
         print("connect")
+        sound_player.cue(SoundCue.CONNECTING)
         tello.connect()
+        sound_player.cue(SoundCue.CONNECTED)
     if controller.get_down(Button.X):
         print("streamon")
         # Enables video stream.
         tello.streamon()
+        sound_player.cue(SoundCue.RECORDING)
     if controller.get_down(Button.Y):
         print("streamoff")
         # Disables video stream.
         tello.streamoff()
+        sound_player.cue(SoundCue.STOP_RECORDING)
     
     # Unsupported by our tello - might need a firmware update.
     """
@@ -216,12 +227,19 @@ def render_drone_view(screen: pygame.Surface, tello: Tello, drone_ipc: DroneIPC)
         drone_ipc.save_frame(frame)
 
         screen_w, screen_h = screen.get_size()
-        left = 3 * screen_w // 12
-        right = 9 * screen_w // 12
-        top = screen_h // 10
-        bottom = 9 * screen_h // 10
 
-        w, h = (right - left), (bottom - top)
+        if FULL_SCREEN_DRONE:
+            left = 0
+            top = 0
+            w = screen_w
+            h = screen_h
+        else:
+            left = 3 * screen_w // 12
+            right = 9 * screen_w // 12
+            top = screen_h // 10
+            bottom = 9 * screen_h // 10
+
+            w, h = (right - left), (bottom - top)
 
         smaller = cv2.resize(frame[:, :, ::-1], (w, h))
         img = pygame.image.frombuffer(smaller.tobytes(), (w, h), "BGR")
@@ -247,6 +265,7 @@ def main() -> None:
     target_seconds_per_frame: float = 1 / 60
     
     controller_state = Input()
+    sound_player = SoundCuePlayer()
 
     autonomous_mode = False
 
@@ -266,18 +285,21 @@ def main() -> None:
             if controller_state.get_down(Button.R_BUTTON):
                 autonomous_mode = not autonomous_mode
                 print(f"{autonomous_mode=}")
+                sound_player.cue(SoundCue.AUTONOMOUS if autonomous_mode else SoundCue.MANUAL)
             if controller_state.get_down(Button.L_BUTTON):
                 tello.emergency()
+                sound_player.cue(SoundCue.EMERGENCY)
 
             if autonomous_mode:
-                control_drone_autonomous(tello, ipc)
+                control_drone_autonomous(tello, ipc, sound_player)
             else:
-                control_drone(tello, controller_state)
+                control_drone(tello, controller_state, sound_player)
             
             screen.fill((0,0,0))
 
             render_drone_view(screen, tello, ipc)
-            draw_controllers(screen, controller_state)
+            if not FULL_SCREEN_DRONE:
+                draw_controllers(screen, controller_state)
 
             pygame.display.flip()
             frame_end = time.time()
