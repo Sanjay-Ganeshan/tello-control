@@ -10,6 +10,7 @@ from .controller_state import (
     clamp,
     WINDOWS_SHIELD_CONTROLLER,
     MAC_SHIELD_CONTROLLER,
+    STEAM_DECK_INTEGRATED_CONTROLLER,
     Binding,
     Input,
     Axis1D,
@@ -19,12 +20,18 @@ from .controller_state import (
 import sys
 
 CONTROLLER: T.List[Binding]
+SCREEN_FLAGS = pygame.RESIZABLE
 if sys.platform == "win32":
     CONTROLLER = WINDOWS_SHIELD_CONTROLLER
 elif sys.platform == "darwin":
     CONTROLLER = MAC_SHIELD_CONTROLLER
+elif sys.platform == "linux":
+    CONTROLLER = STEAM_DECK_INTEGRATED_CONTROLLER
+    SCREEN_FLAGS= pygame.FULLSCREEN
 else:
     raise Exception("Your controller bindings are not defined.")
+
+
 
 
 def draw_controllers(screen: pygame.Surface, controller: Input) -> None:
@@ -231,7 +238,7 @@ def render_drone_view(screen: pygame.Surface, tello: Tello, drone_ipc: DroneIPC)
 def main() -> None:
     pygame.init()
     size = (1280, 800)
-    screen = pygame.display.set_mode(size, pygame.RESIZABLE)
+    screen = pygame.display.set_mode(size, SCREEN_FLAGS)
     tello = Tello()
     tello.LOGGER.setLevel(logging.INFO)
     n_controllers = pygame.joystick.get_count()

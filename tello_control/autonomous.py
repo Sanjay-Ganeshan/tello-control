@@ -1,5 +1,6 @@
 import mmap
 import numpy as np
+from pathlib import Path
 import typing as T
 from dataclasses import dataclass, field
 import sys
@@ -63,12 +64,17 @@ class DroneIPC:
             self.fd = os.open("/tmp/droneipc", os.O_CREAT | os.O_RDWR, mode=0o777)
             os.ftruncate(self.fd, BUFFER_LENGTH)
             self._shmem = mmap.mmap(self.fd, BUFFER_LENGTH)
+        elif sys.platform == "linux":
+            self.fd = os.open(Path(__file__).resolve().parent / "droneipc", os.O_CREAT | os.O_RDWR, mode=0o777)
+            os.ftruncate(self.fd, BUFFER_LENGTH)
+            self._shmem = mmap.mmap(self.fd, BUFFER_LENGTH)
         self._arr = np.frombuffer(self._shmem, dtype=np.uint8)
         return self
     
     def __exit__(self, exc_type, exc, tb):
+        del self._arr
         self._shmem.close()
-        if self.fd:
+        if self.                                                          fd:
             os.close(self.fd)
     
     def save_state(self, state: DroneState) -> None:
