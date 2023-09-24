@@ -211,8 +211,6 @@ def control_drone_autonomous(tello: Tello, drone_ipc: DroneIPC):
 def render_drone_view(screen: pygame.Surface, tello: Tello, drone_ipc: DroneIPC) -> None:
     if tello.stream_on:
         reader = tello.get_frame_read()
-        if not reader.grabbed:
-            return
         
         frame = reader.frame
         drone_ipc.save_frame(frame)
@@ -225,7 +223,7 @@ def render_drone_view(screen: pygame.Surface, tello: Tello, drone_ipc: DroneIPC)
 
         w, h = (right - left), (bottom - top)
 
-        smaller = cv2.resize(frame, (w, h))
+        smaller = cv2.resize(frame[:, :, ::-1], (w, h))
         img = pygame.image.frombuffer(smaller.tobytes(), (w, h), "BGR")
         screen.blit(
             img,
